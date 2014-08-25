@@ -114,10 +114,10 @@ void main_init(void)
     UBRR0H=0x00;
     UBRR0L=0x07;  
     
+    lcd_init(16);
     #asm("sei")
     ADCSRA=0x8f; 
-    
-    lcd_init(16); 
+     
 }
 
 char rx_char(void)
