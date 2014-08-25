@@ -42,7 +42,6 @@
 
 #include <mega128.h>
 #include <delay.h>
-#include <lcd.h>
 #include <stdio.h>
 #asm
    .equ __ds1302_port=0x1B ;PORTA
@@ -51,24 +50,86 @@
    .equ __ds1302_rst=0
    .equ __lcd_port=0x12
 #endasm
+#include <lcd.h>
 #include <ds1302.h>
 
+#define LC           3821
+#define LCX          3607
+#define LD           3404
+#define LDX          3213
+#define LE           3033
+#define LF           2862
+#define LFX          2702
+#define LG           2550
+#define LGX          2407
+#define LA           2272
+#define LAX          2144
+#define LB           2024
+#define MC           1910
+#define MCX          1803
+#define MD           1702
+#define MDX          1606
+#define ME           1516
+#define MF           1431
+#define MFX          1350
+#define MG           1275
+#define MGX          1203
+#define MA           1135
+#define MAX          1072
+#define MB           1011
+#define HC           955 
+#define HCX          901 
+#define HD           850 
+#define HDX          803 
+#define HE           757 
+#define HF           715 
+#define HFX          675 
+#define HG           637 
+#define HGX          601 
+#define HA           567 
+#define HAX          535 
+#define HB           505 
+
+#define N32          1*3
+#define N16          2*3
+#define ND16         3*3
+#define N8           4*3
+#define ND8          6*3
+#define N4           8*3
+#define ND4          12*3
+#define N2           16*3
+#define ND2          24*3
+#define N1           32*3
+
+#define R32          1*3
+#define R16          2*3
+#define RD16         3*3
+#define R8           4*3
+#define RD8          6*3
+#define R4           8*3
+#define RD4          12*3
+#define R2           16*3
+#define RD2          24*3
+#define R1           32*3
+
+unsigned char tempo=4;
 unsigned char arr[16];
 char arr_t[16];
 unsigned char num1,num2,num3,num4,num5,num6,ADC;
 unsigned char arr1[8]={0x0E, 0x11, 0x0E, 0x04, 0x1F, 0x00, 0x10, 0x1F};
 unsigned char arr2[8]={0x00, 0x1E, 0x10, 0x1E, 0x00, 0x04, 0x1F, 0x00};
 unsigned char arr3[8]={0x01, 0x13, 0x13, 0x1D, 0x01, 0x08, 0x0E, 0x00};
-int data, i, alarm=0; //alarm=1 : 경보 on, alarm=0 : 경보 off
+int data, alarm=0; //alarm=1 : 경보 on, alarm=0 : 경보 off
 int ADC_state=0, ADC_temp, ADC_smoke, ADC_human;
 
+void Play_note(unsigned int sound, unsigned int note);
 void string(char *p,char code);
 char rx_char(void);
 void main_init(void);
 void communication(void);
 void LCD_display();
+void ADC_smoke_sensor();
 void ADC_temperature();
-//void ADC_smoke();
 void ADC_human_check();
 void ring_bell();
 
@@ -82,15 +143,16 @@ void main()
     {
         communication();
         
+        ADC_smoke_sensor();   
+        delay_ms(100);
         ADC_temperature();  
-        delay_ms(5);
-        //ADC_smoke();   
-        delay_ms(5);
+        delay_ms(100);
         ADC_human_check();   
-        delay_ms(5); 
+        delay_ms(100); 
         
         LCD_display();
-        //ring_bell();
+        if(PORTE.4==0)
+            ring_bell();
     }
 }
 
@@ -106,18 +168,32 @@ void main_init(void)
     DDRE=0x0e;
     DDRF=0x00;
     DDRG=0x08; 
-    PORTG=0x08;
+    PORTG=0x00;     //PORTG.3 = 1 -> 동작 X / PORTCG.3=0 -> 동작 O
     
     UCSR0B=0xb8;
     UCSR0A=0x00;
     UCSR0C=0x26;
     UBRR0H=0x00;
     UBRR0L=0x07;  
-    
     lcd_init(16);
+    
+    TCCR1A = 0x40;
+    TCCR1B = 0x18; 
+    TCCR1C = 0x00;
+    ADCSRA=0x8f;                                  
     #asm("sei")
-    ADCSRA=0x8f; 
-     
+    
+}
+
+void Play_note(unsigned int sound, unsigned int note) 
+{
+  ICR1= sound;   	     
+  TCNT1 = 0x0000;        
+  TCCR1B = 0x1A;         	
+
+  delay_ms(note*tempo*7);  
+
+  TCCR1B = 0x18;         
 }
 
 char rx_char(void)
@@ -128,8 +204,8 @@ char rx_char(void)
 
 void LCD_display()
 {
-    ADC=(int)ADCL+((int)ADCH<<8);
-    sprintf(arr_t,": %u",((ADC*5)/10)); 
+    //ADC=(int)ADCL+((int)ADCH<<8);
+    sprintf(arr_t,": %u",((ADC_temp*5)/10)); 
     string(arr1,0);
     string(arr2,1);
     string(arr3,2);
@@ -179,14 +255,16 @@ void communication()
         case '5' :                                                                     break;
     }                                                                                  
 }
-    /*
-void ADC_smoke()
+
+  
+void ADC_smoke_sensor()
 {
     ADC_state=0;
-    ADMUX=0x00;
+    ADMUX=0x40;
     ADCSRA=0xcf;
     delay_ms(20);
-} */
+} 
+
 
 void ADC_temperature()
 {
@@ -215,7 +293,124 @@ interrupt [ADC_INT] void adc_project()
 
 void string(char *p,char code)
 {
- char i,a;
- a=(code<<3)|0x40;
- for(i=0;i<8;i++)lcd_write_byte(a++,*p++);
- }
+     char i,a;
+    a=(code<<3)|0x40;
+    for(i=0;i<8;i++)lcd_write_byte(a++,*p++);
+}
+ 
+void ring_bell()
+{
+    Play_note(HG,N8);
+    Play_note(HE,N16);
+    Play_note(HF,N16);
+    Play_note(HG,N8);
+    Play_note(HE,N16);
+    Play_note(HF,N16);
+    Play_note(HG,N16);
+    Play_note(MG,N16);
+    Play_note(MA,N16);
+    Play_note(MB,N16);
+    Play_note(HC,N16);
+    Play_note(HD,N16);
+    Play_note(HE,N16);
+    Play_note(HF,N16);
+    Play_note(HE,N8);
+    Play_note(HC,N16);
+    Play_note(HD,N16);
+    Play_note(HE,N8);
+    Play_note(ME,N16);
+    Play_note(MF,N16); 
+    Play_note(MG,N16);
+    Play_note(MA,N16);
+    Play_note(MG,N16);
+    Play_note(MF,N16);
+    Play_note(MG,N16);
+    Play_note(ME,N16);
+    Play_note(MF,N16);
+    Play_note(MG,N16);
+    Play_note(MF,N8);
+    Play_note(MA,N16);
+    Play_note(MG,N16);
+    Play_note(MF,N8);
+    Play_note(ME,N16);
+    Play_note(MD,N16);
+    Play_note(ME,N16);
+    Play_note(MD,N16);
+    Play_note(MC,N16);
+    Play_note(MD,N16);
+    Play_note(ME,N16);
+    Play_note(MF,N16);
+    Play_note(MG,N16);
+    Play_note(MA,N16);
+    Play_note(MF,N8);
+    Play_note(MA,N16);
+    Play_note(MG,N16);
+    Play_note(MA,N8);
+    Play_note(MB,N16);
+    Play_note(HC,N16); 
+    Play_note(MG,N16);
+    Play_note(MA,N16);
+    Play_note(MB,N16);
+    Play_note(HC,N16);
+    Play_note(HD,N16);
+    Play_note(HE,N16);
+    Play_note(HF,N16);
+    Play_note(HG,N16); 
+    Play_note(HE,N8);
+    Play_note(HC,N16);
+    Play_note(HD,N16);
+    Play_note(HE,N8);
+    Play_note(HD,N16);
+    Play_note(HC,N16);
+    Play_note(HD,N16);
+    Play_note(MB,N16);
+    Play_note(HC,N16);
+    Play_note(HD,N16);
+    Play_note(HE,N16);
+    Play_note(HD,N16);
+    Play_note(HC,N16);
+    Play_note(MB,N16);
+    Play_note(HC,N8);
+    Play_note(MA,N16);
+    Play_note(MB,N16);
+    Play_note(HC,N8);
+    Play_note(MC,N16);
+    Play_note(MD,N16);
+    Play_note(ME,N16);
+    Play_note(MF,N16);
+    Play_note(ME,N16);
+    Play_note(MD,N16);
+    Play_note(ME,N16);
+    Play_note(HC,N16);
+    Play_note(MB,N16);
+    Play_note(HC,N16);
+    Play_note(MA,N8);
+    Play_note(HC,N16);
+    Play_note(MB,N16);
+    Play_note(MA,N8);
+    Play_note(MG,N16);
+    Play_note(MF,N16);
+    Play_note(MG,N16);
+    Play_note(MF,N16);
+    Play_note(ME,N16);
+    Play_note(MF,N16);
+    Play_note(MG,N16);
+    Play_note(MA,N16);
+    Play_note(MB,N16);
+    Play_note(HC,N16);
+    Play_note(MA,N8);
+    Play_note(HC,N16);
+    Play_note(MB,N16);
+    Play_note(HC,N8);
+    Play_note(MB,N16);
+    Play_note(MA,N16);
+    Play_note(MB,N16);
+    Play_note(HC,N16);
+    Play_note(HD,N16);
+    Play_note(HC,N16);
+    Play_note(MB,N16);
+    Play_note(HC,N16);
+    Play_note(MA,N16);
+    Play_note(MB,N16);
+    Play_note(HC,ND4);
+}
