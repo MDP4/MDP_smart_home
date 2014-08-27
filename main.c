@@ -424,3 +424,135 @@ void ring_bell()
     Play_note(MB,N16);
     Play_note(HC,ND4);
 }
+이수진
+2014-08-26 오전 03:08
+이수진
+이것좀올려줘 github에
+오늘
+이수진
+오후 9:11
+이수진
+/*              
+    PD.0~7 - LCD                    
+    PF.0 - 연기센서
+    PF.1 - 온도센서                 
+    PF.2 - 인체감지센서             
+    PG.3 - ATmega128 전원 on/off 
+    
+    PC.6 = 1
+    PC.7 = 0 DC motor
+*/
+#include <mega128.h>
+#include <delay.h>
+#include <stdio.h>
+#asm
+   .equ __lcd_port=0x12 
+#endasm
+#include <lcd.h>
+unsigned char ADC_state=0, ADC_temp, ADC_smoke, ADC_human;
+unsigned char arr_temp[8];
+unsigned char arr_smoke[8];
+unsigned char arr_human[8];
+int i;
+void main_init(void);
+void LCD_display();
+void ADC_smoke_sensor();
+void ADC_temperature();
+void ADC_human_check();
+void main()
+{
+    main_init();     
+         
+    while(1)
+    {  /*
+        ADC_smoke_sensor();   
+        delay_ms(100);
+        ADC_temperature();  
+        delay_ms(100);
+        ADC_human_check();   
+        delay_ms(100); 
+        */
+        LCD_display(); 
+    
+    }
+}
+void main_init(void)
+{   
+    DDRB=0xff;
+    DDRC=0xf0;
+    DDRD=0xff;
+    DDRE=0x0e;
+    DDRF=0x00;
+    DDRG=0x08; 
+    PORTG=0x00;     //PORTG.3 = 1 -> 동작 X / PORTCG.3=0 -> 동작 O
+    PORTC.6=1;
+    PORTC.7=0;
+                     
+    TCCR1A = 0x40;
+    TCCR1B = 0x18; 
+    TCCR1C = 0x00;
+    ADCSRA=0x8f;                                  
+    #asm("sei")
+    
+    lcd_init(16);   
+}
+void LCD_display()
+{   /*
+    sprintf(arr_temp,"temp:%u",((ADC_temp*5)/10));
+    sprintf(arr_smoke,"smoke:%u", ADC_smoke);  
+    sprintf(arr_human,"human:%u", ADC_human);
+      
+    lcd_gotoxy(0,0);    
+    lcd_puts(arr_temp); 
+    lcd_gotoxy(0,8);
+    lcd_puts(arr_smoke);   
+    lcd_gotoxy(0,1);  
+    lcd_puts(arr_human);
+    */       
+    lcd_gotoxy(0,0);
+    lcd_puts("abcd");
+}
+  
+void ADC_smoke_sensor()
+{
+    ADC_state=0;
+    ADMUX=0x40;
+    ADCSRA=0xcf;
+    delay_ms(20);
+} 
+void ADC_temperature()
+{
+    ADC_state=1;
+    ADMUX=0x01;
+    ADCSRA=0xcf;
+    delay_ms(20);
+}
+void ADC_human_check()
+{
+    ADC_state=2;
+    ADMUX=0x02;
+    ADCSRA=0xcf;
+    delay_ms(20);
+}
+/*  
+interrupt [ADC_INT] void adc_project()
+{
+    switch(ADC_state)
+    {
+        case 0 : ADC_smoke=ADCW;
+        case 1 : ADC_temp=ADCW;
+        case 2 : ADC_human=ADCW;
+    }   
+    if(ADC_smoke || ADC_temp || ADC_human)
+    {
+        for(i=0;i<60;i++)
+        {
+            PORTB.7=1; 
+            delay_ms(19); 
+            PORTB.7=0; 
+            delay_ms(1);
+        }
+        PORTG=0x00;             //전원 차단 
+    }
+}       
+  */
