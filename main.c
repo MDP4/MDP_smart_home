@@ -107,6 +107,17 @@
 #define R2           16*3
 #define RD2          24*3
 #define R1           32*3
+#define LED1_ON      'D'
+#define LED1_OFF     'd'
+#define STOVE_OFF    'c'
+#define STOVE1_ON    'C'
+#define STOVE2_ON    'G'
+#define POWER_SAVE   'S'
+#define WINDOW_OPEN  'B'
+#define WINDOW_CLOSE 'b'
+#define GAS_OPEN     'A'
+#define GAS_CLOSE    'a'
+
 unsigned char tempo=4;
 unsigned char arr[16];
 char arr_t[16];
@@ -117,9 +128,9 @@ unsigned char arr3[8]={0x01, 0x13, 0x13, 0x1D, 0x01, 0x08, 0x0E, 0x00};
 int data, alarm=0; //alarm=1 : 경보 on, alarm=0 : 경보 off
 int ADC_state=0, ADC_temp, ADC_smoke, ADC_human;
 int triac_time;         // 트라이악(램프 제어) 인터럽트에서 시간
+char rx_char;           //수신 문자
 void Play_note(unsigned int sound, unsigned int note);
 void string(char *p,char code);
-char rx_char(void);
 void main_init(void);
 void communication(void);
 void LCD_display();
@@ -149,9 +160,7 @@ void main()
 }
 void main_init(void)
 {   
-    rtc_set_time(7,20,7);
-    rtc_set_date(25,8,14);
-    rtc_init(0,0,0);
+    
     DDRB=0xff;
     DDRC=0x00;
     DDRD=0xff;
@@ -165,7 +174,12 @@ void main_init(void)
     UCSR0C=0x26;
     UBRR0H=0x00;
     UBRR0L=0x07;  
-    //lcd_init(16);
+    lcd_init(16);
+    
+    rtc_set_time(7,20,7);
+    rtc_set_date(25,8,14);
+    rtc_init(0,0,0);
+    
     
     EICRB=0b10101010;
     EIMSK=0b00110000;
@@ -173,7 +187,8 @@ void main_init(void)
     TCCR1A = 0x40;
     TCCR1B = 0x18; 
     TCCR1C = 0x00;
-    ADCSRA=0x8f;                                  
+    ADCSRA=0x8f;                
+    
     #asm("sei")
     
 }
@@ -185,15 +200,10 @@ void Play_note(unsigned int sound, unsigned int note)
   delay_ms(note*tempo*7);  
   TCCR1B = 0x18;         
 }
-char rx_char(void)
-{
-    while((UCSR0A&0x80)==0);
-    return UDR0;
-}
 void LCD_display()
 {
     //ADC=(int)ADCL+((int)ADCH<<8);
-    sprintf(arr_t,": %u",((ADC_temp*5)/10)); 
+    sprintf(arr_t,": %u",((float)((ADC_temp*5)/1023)*0.01)); 
     string(arr1,0);
     string(arr2,1);
     string(arr3,2);
@@ -221,10 +231,10 @@ void communication()
     data=rx_char();
     switch(data)
     {
-        case 'A' : for(j=0;j<60;j++){PORTB.6=1; delay_ms(19); PORTB.6=0; delay_ms(1);} break;
-        case 'a' : for(j=0;j<60;j++){PORTB.6=0; delay_ms(19); PORTB.6=1; delay_ms(1);} break;
-        case 'B' : for(j=0;j<60;j++){PORTB.7=1; delay_ms(19); PORTB.7=0; delay_ms(1);} break;
-        case 'b' : for(j=0;j<60;j++){PORTB.7=0; delay_ms(19); PORTB.7=1; delay_ms(1);} break;
+        case 'A' : for(j=0;j<60;j++){PORTB.6=1; delay_ms(15); PORTB.6=0; delay_ms(5);} break;
+        case 'a' : for(j=0;j<60;j++){PORTB.6=0; delay_ms(15); PORTB.6=1; delay_ms(5);} break;
+        case 'B' : for(j=0;j<60;j++){PORTB.7=1; delay_ms(15); PORTB.7=0; delay_ms(5);} break;
+        case 'b' : for(j=0;j<60;j++){PORTB.7=0; delay_ms(15); PORTB.7=1; delay_ms(5);} break;
         case 'C' : do{PORTC.6=0; PORTC.7=1; delay_ms(10);}while(PINE.5==0);            break;
         case 'c' : do{PORTC.6=1; PORTC.7=0; delay_ms(10);}while(PINE.6==0);            break;
         case 'D' : PORTC.5=0;                                                          break;
@@ -291,6 +301,10 @@ interrupt [ADC_INT] void adc_project()
         case 1 : ADC_temp=ADCW;
         case 2 : ADC_human=ADCW;
     }
+}
+interrupt [UART0_RXC] void a(void)
+{
+ rx_char=UDR0;
 }
 void string(char *p,char code)
 {
