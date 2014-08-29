@@ -42,6 +42,8 @@
 #include <mega128.h>
 #include <delay.h>
 #include <stdio.h>
+#include <lcd.h>
+#include <ds1302.h>
 #asm
    .equ __ds1302_port=0x1B ;PORTA
    .equ __ds1302_io=1
@@ -49,8 +51,6 @@
    .equ __ds1302_rst=0
    .equ __lcd_port=0x12 ;PORTD
 #endasm
-#include <lcd.h>
-#include <ds1302.h>
 #define LC           3821
 #define LCX          3607
 #define LD           3404
@@ -118,17 +118,17 @@
 #define GAS_OPEN     'A'
 #define GAS_CLOSE    'a'
 
-unsigned char tempo=4;
+unsigned char tempo=6;
 unsigned char arr[16];
 char arr_t[16];
 unsigned char num1,num2,num3,num4,num5,num6;
 unsigned char arr1[8]={0x0E, 0x11, 0x0E, 0x04, 0x1F, 0x00, 0x10, 0x1F};
 unsigned char arr2[8]={0x00, 0x1E, 0x10, 0x1E, 0x00, 0x04, 0x1F, 0x00};
 unsigned char arr3[8]={0x01, 0x13, 0x13, 0x1D, 0x01, 0x08, 0x0E, 0x00};
-int data, alarm=0; //alarm=1 : 경보 on, alarm=0 : 경보 off
+int alarm=0; //alarm=1 : 경보 on, alarm=0 : 경보 off
 int ADC_state=0, ADC_temp, ADC_smoke, ADC_human;
 int triac_time;         // 트라이악(램프 제어) 인터럽트에서 시간
-char rx_char;           //수신 문자
+char data;           //수신 문자
 void Play_note(unsigned int sound, unsigned int note);
 void string(char *p,char code);
 void main_init(void);
@@ -203,7 +203,7 @@ void Play_note(unsigned int sound, unsigned int note)
 void LCD_display()
 {
     //ADC=(int)ADCL+((int)ADCH<<8);
-    sprintf(arr_t,": %u",((float)((ADC_temp*5)/1023)*0.01)); 
+    sprintf(arr_t,": %u",((int)((ADC_temp*5)/1023)*0.01)); 
     string(arr1,0);
     string(arr2,1);
     string(arr3,2);
@@ -228,7 +228,6 @@ void communication()
 {
     unsigned int j;
     
-    data=rx_char();
     switch(data)
     {
         case 'A' : for(j=0;j<60;j++){PORTB.6=1; delay_ms(15); PORTB.6=0; delay_ms(5);} break;
@@ -304,7 +303,8 @@ interrupt [ADC_INT] void adc_project()
 }
 interrupt [UART0_RXC] void a(void)
 {
- rx_char=UDR0;
+ data=UDR0;
+ delay_ua(5);
 }
 void string(char *p,char code)
 {
