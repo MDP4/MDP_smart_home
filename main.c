@@ -137,9 +137,9 @@ void ADC_temperature();
 void ADC_human_check();
 void Play_note(unsigned int sound, unsigned int note);
 void string(char *p,char code);
+void warning_sound();
 void ring_bell();
 void ring_caution();
-void warning_sound();
 
 unsigned char tempo=6;
 unsigned char arr[16];
@@ -159,17 +159,13 @@ void main()
 
     while(1)
     {
-        communication();
-
+       // communication();
         ADC_smoke_sensor();
-        delay_ms(100);
         ADC_temperature();
-        delay_ms(100);
         ADC_human_check();
-        delay_ms(100);
         warning_sound();
-
         LCD_display();
+
     }
 }
 void main_init(void)
@@ -183,16 +179,20 @@ void main_init(void)
     DDRG=0x08;
     PORTG=0x00;     //PORTG.3 = 1 -> 동작 X / PORTCG.3=0 -> 동작 O
 
-    UCSR0B=0xb8;
-    UCSR0A=0x00;
-    UCSR0C=0x26;
-    UBRR0H=0x00;
-    UBRR0L=0x07;
+   // UCSR0B=0xb8;
+   // UCSR0A=0x00;
+   // UCSR0C=0x26;
+   // UBRR0H=0x00;
+   // UBRR0L=0x07;
     lcd_init(16);
+    lcd_puts("init_OK");
 
     rtc_set_time(7,20,7);
     rtc_set_date(25,8,14);
     rtc_init(0,0,0);
+    lcd_gotoxy(0,0);
+    lcd_gotoxy(0,0);
+    lcd_puts("init_OK2");
 
     EICRB=0b10101010;
     EIMSK=0b00110000;
@@ -200,10 +200,11 @@ void main_init(void)
     TCCR1A = 0x40;
     TCCR1B = 0x18;
     TCCR1C = 0x00;
-    ADCSRA=0x8f;
+    ADCSRA=0x87;
 
-    #asm("sei")
-
+    SREG=0x80;
+    lcd_gotoxy(0,0);
+    lcd_puts("init_OK3");
 }
 void Play_note(unsigned int sound, unsigned int note)
 {
@@ -216,7 +217,7 @@ void Play_note(unsigned int sound, unsigned int note)
 void LCD_display()
 {
     //ADC=(int)ADCL+((int)ADCH<<8);
-    sprintf(arr_t,": %u",((int)((ADC_temp*5)/1023)*0.01));
+    sprintf(arr_t,": %u",((ADC_temp*5)/10));
     string(arr1,0);
     string(arr2,1);
     string(arr3,2);
@@ -271,21 +272,27 @@ void ADC_smoke_sensor()
     ADC_state=0;
     ADMUX=0x40;
     ADCSRA=0xcf;
-    delay_ms(20);
+    delay_ms(100);
+    ADCSRA=0xc7;
+    delay_ms(100);
 }
 void ADC_temperature()
 {
     ADC_state=1;
     ADMUX=0x01;
     ADCSRA=0xcf;
-    delay_ms(20);
+    delay_ms(100);
+    ADCSRA=0xc7;
+    delay_ms(100);
 }
 void ADC_human_check()
 {
     ADC_state=2;
     ADMUX=0x02;
     ADCSRA=0xcf;
-    delay_ms(20);
+    delay_ms(100);
+    ADCSRA=0xc7;
+    delay_ms(100);
 }
 void warning_sound()
 {
@@ -305,8 +312,8 @@ void warning_sound()
         PORTC.5=1;
         ring_caution();                    //경보
     }
-
-interrupt [ADC_INT] void adc_project()
+}
+interrupt [ADC_INT] void adc_project(void)
 {
     switch(ADC_state)
     {
