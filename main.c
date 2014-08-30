@@ -51,62 +51,23 @@
    .equ __ds1302_rst=0
    .equ __lcd_port=0x12 ;PORTD
 #endasm
-#define LC           3821
-#define LCX          3607
-#define LD           3404
-#define LDX          3213
-#define LE           3033
-#define LF           2862
-#define LFX          2702
-#define LG           2550
-#define LGX          2407
-#define LA           2272
-#define LAX          2144
-#define LB           2024
 #define MC           1910
-#define MCX          1803
 #define MD           1702
-#define MDX          1606
 #define ME           1516
 #define MF           1431
-#define MFX          1350
 #define MG           1275
-#define MGX          1203
 #define MA           1135
-#define MAX          1072
 #define MB           1011
 #define HC           955
-#define HCX          901
 #define HD           850
-#define HDX          803
 #define HE           757
 #define HF           715
-#define HFX          675
 #define HG           637
-#define HGX          601
-#define HA           567
-#define HAX          535
-#define HB           505
-#define N32          1*3
 #define N16          2*3
-#define ND16         3*3
 #define N8           4*3
-#define ND8          6*3
-#define N4           8*3
 #define ND4          12*3
-#define N2           16*3
-#define ND2          24*3
 #define N1           32*3
-#define R32          1*3
-#define R16          2*3
-#define RD16         3*3
-#define R8           4*3
-#define RD8          6*3
-#define R4           8*3
-#define RD4          12*3
-#define R2           16*3
-#define RD2          24*3
-#define R1           32*3
+
 #define VALVE_OPEN    'A'
 #define VALVE_CLOSE   'a'
 #define WINDOW_OPEN   'B'
@@ -115,8 +76,8 @@
 #define CURTAIN_CLOSE 'c'
 #define LED1_ON       'D'
 #define LED1_OFF      'd'
-#define LED2_ON       'E'
-#define LED2_OFF      'e'
+#define WARNING_ON    'E'
+#define WARNING_OFF   'e'
 #define STOVE1_ON     'F'
 #define STOVE1_OFF    'f'
 #define STOVE2_ON     'G'
@@ -141,7 +102,7 @@ void warning_sound();
 void ring_bell();
 void ring_caution();
 
-unsigned char tempo=6;
+unsigned char tempo=4;
 unsigned char arr[16];
 char arr_t[16];
 unsigned char num1,num2,num3,num4,num5,num6;
@@ -165,7 +126,9 @@ void main()
         ADC_human_check();
         warning_sound();
         LCD_display();
-
+        PORTB.6=0;
+        PORTB.7=1;
+        delay_ms(2);
     }
 }
 void main_init(void)
@@ -252,12 +215,12 @@ void communication()
         case CURTAIN_CLOSE : do{PORTC.6=1; PORTC.7=0; delay_ms(10);}while(PINE.6==0);            break;
         case LED1_ON       : PORTC.5=0;                                                          break;
         case LED1_OFF      : PORTC.5=1;                                                          break;
-        case LED2_ON       : alarm=1;                                                            break;
-        case LED2_OFF      : alarm=0;                                                            break;
+        case WARNING_ON    : alarm=1;                                                            break;
+        case WARNING_OFF   : alarm=0;                                                            break;
         case STOVE1_ON     : PORTE.2=0;                                                          break;
         case STOVE1_OFF    : PORTE.2=1;                                                          break;
         case STOVE2_ON     : PORTE.3=0;                                                          break;
-        case STOVE2_OFF    : PORTE.3=1;
+        case STOVE2_OFF    : PORTE.3=1;                                                          break;
         case LAMP_OFF      : triac_time=0;                                                       break;
         case LAMP_1        : triac_time=200;                                                     break;
         case LAMP_2        : triac_time=1000;                                                    break;
@@ -309,8 +272,11 @@ void warning_sound()
     }
     else
     {
-        PORTC.5=1;
-        ring_caution();                    //경보
+        if(ADC_human>500)
+        {
+            PORTC.5=1;
+            ring_caution();            //경보
+        }
     }
 }
 interrupt [ADC_INT] void adc_project(void)
@@ -335,7 +301,11 @@ void string(char *p,char code)
 }
 interrupt [EXT_INT4] void int_bell()
 {
+    EIMSK=0x20;
     ring_bell();
+    //ring_caution();
+    delay_ms(10);
+    EIMSK=0x30;
 }
 interrupt [EXT_INT5] void triac_bright1()
 {
@@ -345,11 +315,7 @@ interrupt [EXT_INT5] void triac_bright1()
 }
 void ring_caution()
 {
-    unsigned char k;
-    for(k=0;k<10;k++)
-    {
-        Play_note(HE,N16);
-    }
+        Play_note(HE,N1);
 }
 void ring_bell()
 {
