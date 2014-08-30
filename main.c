@@ -129,6 +129,18 @@
 #define LAMP_5        '5'
 #define POWER_SAVE    'S'
 
+void main_init(void);
+void communication(void);
+void LCD_display();
+void ADC_smoke_sensor();
+void ADC_temperature();
+void ADC_human_check();
+void Play_note(unsigned int sound, unsigned int note);
+void string(char *p,char code);
+void ring_bell();
+void ring_caution();
+void warning_sound();
+
 unsigned char tempo=6;
 unsigned char arr[16];
 char arr_t[16];
@@ -139,17 +151,8 @@ unsigned char arr3[8]={0x01, 0x13, 0x13, 0x1D, 0x01, 0x08, 0x0E, 0x00};
 int alarm=0; //alarm=1 : 경보 on, alarm=0 : 경보 off
 int ADC_state=0, ADC_temp, ADC_smoke, ADC_human;
 int triac_time;         // 트라이악(램프 제어) 인터럽트에서 시간
-char data;           //수신 문자
-void Play_note(unsigned int sound, unsigned int note);
-void string(char *p,char code);
-void main_init(void);
-void communication(void);
-void LCD_display();
-void ADC_smoke_sensor();
-void ADC_temperature();
-void ADC_human_check();
-void ring_bell();
-void warning_sound();
+char data;             //수신 문자
+
 void main()
 {
     main_init();
@@ -191,7 +194,6 @@ void main_init(void)
     rtc_set_date(25,8,14);
     rtc_init(0,0,0);
 
-
     EICRB=0b10101010;
     EIMSK=0b00110000;
 
@@ -205,11 +207,11 @@ void main_init(void)
 }
 void Play_note(unsigned int sound, unsigned int note)
 {
-  ICR1= sound;
-  TCNT1 = 0x0000;
-  TCCR1B = 0x1A;
-  delay_ms(note*tempo*7);
-  TCCR1B = 0x18;
+    ICR1= sound;
+    TCNT1 = 0x0000;
+    TCCR1B = 0x1A;
+    delay_ms(note*tempo*7);
+    TCCR1B = 0x18;
 }
 void LCD_display()
 {
@@ -301,7 +303,7 @@ void warning_sound()
     else
     {
         PORTC.5=1;
-                            //경보
+        ring_caution();                    //경보
     }
 
 interrupt [ADC_INT] void adc_project()
@@ -316,7 +318,7 @@ interrupt [ADC_INT] void adc_project()
 interrupt [USART0_RXC] void a(void)
 {
     data=UDR0;
-    delay_ua(5);
+    delay_us(5);
 }
 void string(char *p,char code)
 {
@@ -333,6 +335,14 @@ interrupt [EXT_INT5] void triac_bright1()
     PORTB.4=1;
     delay_ms(triac_time);
     PORTB.4=0;
+}
+void ring_caution()
+{
+    unsigned char k;
+    for(k=0;k<10;k++)
+    {
+        Play_note(HE,N16);
+    }
 }
 void ring_bell()
 {
