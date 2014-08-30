@@ -1,17 +1,4 @@
 /*
- * LCD
- * RTC(real time clock)
- * 스피커, 초인종
- * 형광등
- * 현관등
- * 인체감지센서
- * 가스레인지(네온), 밸브(서보)
- * 커튼(DC motor, 마그네틱 센서)
- * 창문(서보)
- * 온도 센서(LM35)
- */
-
-/*
   핀 배치
 
     PE.0~1 - Wi-fi              0번 입력 1번 출력
@@ -20,6 +7,7 @@
     PE.4 - 초인종(스위치)
     PE.5 - 트라이악 제어 인터럽트1
     PE.6 - 트라이악 제어 인터럽트2
+    PE.7 - 차단된 전원 ON switch
 
     PB.4 - 램프 (5단계) 높을수록 밝음 // '1' ~ '5'높을수록 밝기가 셈
     PB.5 - 스피커(초인종 소리 또는 경보)
@@ -30,6 +18,7 @@
     PF.0 - 연기센서
     PF.1 - 온도센서
     PF.2 - 인체감지센서
+
     PA.0~2 - RTC
     PA.3 - 마그네틱 센서1(커튼 위)
     PA.4 - 마그네틱 센서2(커튼 아래)
@@ -99,6 +88,7 @@ void ADC_human_check();
 void Play_note(unsigned int sound, unsigned int note);
 void string(char *p,char code);
 void warning_sound();
+void power_block();
 void ring_bell();
 void ring_caution();
 
@@ -125,10 +115,8 @@ void main()
         ADC_temperature();
         ADC_human_check();
         warning_sound();
+        power_block();
         LCD_display();
-        PORTB.6=0;
-        PORTB.7=1;
-        delay_ms(2);
     }
 }
 void main_init(void)
@@ -141,6 +129,7 @@ void main_init(void)
     DDRF=0x00;
     DDRG=0x08;
     PORTG=0x00;     //PORTG.3 = 1 -> 동작 X / PORTCG.3=0 -> 동작 O
+    PORTB.4=0;
 
    // UCSR0B=0xb8;
    // UCSR0A=0x00;
@@ -169,18 +158,11 @@ void main_init(void)
     lcd_gotoxy(0,0);
     lcd_puts("init_OK3");
 }
-void Play_note(unsigned int sound, unsigned int note)
-{
-    ICR1= sound;
-    TCNT1 = 0x0000;
-    TCCR1B = 0x1A;
-    delay_ms(note*tempo*7);
-    TCCR1B = 0x18;
-}
+
 void LCD_display()
 {
     //ADC=(int)ADCL+((int)ADCH<<8);
-    sprintf(arr_t,": %u",((ADC_temp*5)/10));
+    sprintf(arr_t,": %u",ADC_temp);
     string(arr1,0);
     string(arr2,1);
     string(arr3,2);
@@ -198,7 +180,9 @@ void LCD_display()
     num4=ds1302_read(0x87);
     num5=ds1302_read(0x89);
     num6=ds1302_read(0x8b);
-    sprintf(arr,"%02d/%02d %02d:%02d:%02d",(num5&0x0f)+((num5>>4)&0x0f)*10,(num4&0x0f)+((num4>>4)&0x02)*10,(num3&0x0f)+((num3>>4)&0x03)*10,(num2&0x0f)+((num2>>4)&0x0f)*10,(num1&0x0f)+((num1>>4)&0x0f)*10);
+    sprintf (arr,"%02d/%02d %02d:%02d:%02d",(num5&0x0f)+((num5>>4)&0x0f)*10,
+            (num4&0x0f)+((num4>>4)&0x02)*10,(num3&0x0f)+((num3>>4)&0x03)*10,
+            (num2&0x0f)+((num2>>4)&0x0f)*10,(num1&0x0f)+((num1>>4)&0x0f)*10);
     lcd_puts(arr);
 }
 void communication()
@@ -207,29 +191,28 @@ void communication()
 
     switch(data)
     {
-        case VALVE_OPEN    : for(j=0;j<60;j++){PORTB.6=1; delay_ms(15); PORTB.6=0; delay_ms(5);} break;
-        case VALVE_CLOSE   : for(j=0;j<60;j++){PORTB.6=0; delay_ms(15); PORTB.6=1; delay_ms(5);} break;
-        case WINDOW_OPEN   : for(j=0;j<60;j++){PORTB.7=1; delay_ms(15); PORTB.7=0; delay_ms(5);} break;
-        case WINDOW_CLOSE  : for(j=0;j<60;j++){PORTB.7=0; delay_ms(15); PORTB.7=1; delay_ms(5);} break;
-        case CURTAIN_OPEN  : do{PORTC.6=0; PORTC.7=1; delay_ms(10);}while(PINE.5==0);            break;
-        case CURTAIN_CLOSE : do{PORTC.6=1; PORTC.7=0; delay_ms(10);}while(PINE.6==0);            break;
-        case LED1_ON       : PORTC.5=0;                                                          break;
-        case LED1_OFF      : PORTC.5=1;                                                          break;
-        case WARNING_ON    : alarm=1;                                                            break;
-        case WARNING_OFF   : alarm=0;                                                            break;
-        case STOVE1_ON     : PORTE.2=0;                                                          break;
-        case STOVE1_OFF    : PORTE.2=1;                                                          break;
-        case STOVE2_ON     : PORTE.3=0;                                                          break;
-        case STOVE2_OFF    : PORTE.3=1;                                                          break;
-        case LAMP_OFF      : triac_time=0;                                                       break;
-        case LAMP_1        : triac_time=200;                                                     break;
-        case LAMP_2        : triac_time=1000;                                                    break;
-        case LAMP_3        : triac_time=5000;                                                    break;
-        case LAMP_4        : triac_time=10000;                                                   break;
-        case LAMP_5        : triac_time=50000;                                                   break;
+        case VALVE_OPEN    : for(j=0;j<60;j++){PORTB.6=1; delay_us(1050); PORTB.6=0; delay_ms(23);} break;
+        case VALVE_CLOSE   : for(j=0;j<60;j++){PORTB.6=0; delay_ms(1950); PORTB.6=1; delay_ms(23);} break;
+        case WINDOW_OPEN   : for(j=0;j<60;j++){PORTB.7=1; delay_ms(1050); PORTB.7=0; delay_ms(23);} break;
+        case WINDOW_CLOSE  : for(j=0;j<60;j++){PORTB.7=0; delay_ms(1950); PORTB.7=1; delay_ms(23);} break;
+        case CURTAIN_OPEN  : do{PORTC.6=0; PORTC.7=1; delay_ms(10);}while(PINE.5==0);               break;
+        case CURTAIN_CLOSE : do{PORTC.6=1; PORTC.7=0; delay_ms(10);}while(PINE.6==0);               break;
+        case LED1_ON       : PORTC.5=0;                                                             break;
+        case LED1_OFF      : PORTC.5=1;                                                             break;
+        case WARNING_ON    : alarm=1;                                                               break;
+        case WARNING_OFF   : alarm=0;                                                               break;
+        case STOVE1_ON     : PORTE.2=0;                                                             break;
+        case STOVE1_OFF    : PORTE.2=1;                                                             break;
+        case STOVE2_ON     : PORTE.3=0;                                                             break;
+        case STOVE2_OFF    : PORTE.3=1;                                                             break;
+        case LAMP_OFF      : triac_time=0;                                                          break;
+        case LAMP_1        : triac_time=1;                                                          break;
+        case LAMP_2        : triac_time=2;                                                          break;
+        case LAMP_3        : triac_time=3;                                                          break;
+        case LAMP_4        : triac_time=4;                                                          break;
+        case LAMP_5        : triac_time=5;                                                          break;
     }
 }
-
 void ADC_smoke_sensor()
 {
     ADC_state=0;
@@ -275,9 +258,19 @@ void warning_sound()
         if(ADC_human>500)
         {
             PORTC.5=1;
-            ring_caution();            //경보
+            ring_caution();            //경보 (침입자)
         }
     }
+}
+void power_block()
+{
+    if((ADC_smoke>300) && (ADC_temp>50))
+    {
+        ring_caution();                 //경보 (화재)
+        PORTG=0xff;
+    }
+    if(PINE.7==0)
+        PORTG=0x00;
 }
 interrupt [ADC_INT] void adc_project(void)
 {
@@ -287,6 +280,38 @@ interrupt [ADC_INT] void adc_project(void)
         case 1 : ADC_temp=ADCW;
         case 2 : ADC_human=ADCW;
     }
+    ADC_temp=(int)(((ADC_temp*5)/1023)*0.01);
+}
+
+interrupt [EXT_INT4] void int_bell()
+{
+    EIMSK=0x20;
+    ring_bell();                //초인종
+    delay_ms(10);
+    EIMSK=0x30;
+}
+interrupt [EXT_INT5] void triac_bright1()
+{
+    PORTB.4=1;
+    switch(triac_time)
+    {
+        case 0 : delay_us(0);    break;
+        case 1 : delay_us(500);  break;
+        case 2 : delay_us(1000); break;
+        case 3 : delay_us(3000); break;
+        case 4 : delay_us(5000); break;
+        case 5 : delay_us(7500);
+    }
+    PORTB.4=0;
+}
+
+void Play_note(unsigned int sound, unsigned int note)
+{
+    ICR1= sound;
+    TCNT1 = 0x0000;
+    TCCR1B = 0x1A;
+    delay_ms(note*tempo*7);
+    TCCR1B = 0x18;
 }
 interrupt [USART0_RXC] void a(void)
 {
@@ -295,27 +320,13 @@ interrupt [USART0_RXC] void a(void)
 }
 void string(char *p,char code)
 {
-     char i,a;
+    char i,a;
     a=(code<<3)|0x40;
     for(i=0;i<8;i++)lcd_write_byte(a++,*p++);
 }
-interrupt [EXT_INT4] void int_bell()
-{
-    EIMSK=0x20;
-    ring_bell();
-    //ring_caution();
-    delay_ms(10);
-    EIMSK=0x30;
-}
-interrupt [EXT_INT5] void triac_bright1()
-{
-    PORTB.4=1;
-    delay_ms(triac_time);
-    PORTB.4=0;
-}
 void ring_caution()
 {
-        Play_note(HE,N1);
+    Play_note(HE,N1);
 }
 void ring_bell()
 {
