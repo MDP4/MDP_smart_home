@@ -69,8 +69,6 @@
 #define WARNING_OFF   'e'
 #define STOVE1_ON     'F'
 #define STOVE1_OFF    'f'
-#define STOVE2_ON     'G'
-#define STOVE2_OFF    'g'
 #define LAMP_OFF      '0'
 #define LAMP_1        '1'
 #define LAMP_2        '2'
@@ -201,8 +199,6 @@ void communication()
         case WARNING_OFF   : alarm=0;                                                               break;
         case STOVE1_ON     : PORTE.2=0;                                                             break;
         case STOVE1_OFF    : PORTE.2=1;                                                             break;
-        case STOVE2_ON     : PORTE.3=0;                                                             break;
-        case STOVE2_OFF    : PORTE.3=1;                                                             break;
         case LAMP_OFF      : triac_time=0;                                                          break;
         case LAMP_1        : triac_time=1;                                                          break;
         case LAMP_2        : triac_time=2;                                                          break;
