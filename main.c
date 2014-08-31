@@ -1,32 +1,3 @@
-/*
-  핀 배치
-
-    PE.0~1 - Wi-fi              0번 입력 1번 출력
-    PE.2 - 가스레인지 불        on : 'F' / off : 'f'
-    PE.4 - 초인종(스위치)
-    PE.5 - 트라이악 제어 인터럽트1
-    PE.6 - 트라이악 제어 인터럽트2
-    PE.7 - 차단된 전원 ON switch
-
-    PB.4 - 램프 (5단계) 높을수록 밝음 // '1' ~ '5'높을수록 밝기가 셈
-    PB.5 - 스피커(초인종 소리 또는 경보)
-    PB.6 - 가스밸브(서보모터)       on : 'A' / off : 'a'
-    PB.7 - 창문(서보모터)           open : 'B' / close : 'b'
-
-    PD.0~7 - LCD
-    PF.0 - 연기센서
-    PF.1 - 온도센서
-    PF.2 - 인체감지센서
-
-    PA.0~2 - RTC
-    PA.3 - 마그네틱 센서1(커튼 위)
-    PA.4 - 마그네틱 센서2(커튼 아래)
-    PC.6~7 - 커튼(DC motor)         open : 'C' / close : 'c'
-    PC.5 - 형광등                   on : 'D' / off : 'd'
-    PC.4 - 현관등              경보 on : 'E' / off : 'e'   //고휘도 LED - 0 : on, 1 : off
-
-    PG.3 - ATmega128 전원 on/off
-*/
 #include <mega128.h>
 #include <delay.h>
 #include <stdio.h>
@@ -107,7 +78,7 @@ void main()
 
     while(1)
     {
-       // communication();
+        communication();
         ADC_smoke_sensor();
         ADC_temperature();
         ADC_human_check();
@@ -127,11 +98,11 @@ void main_init(void)
     PORTG=0x00;     //PORTG.3 = 1 -> 동작 X / PORTCG.3=0 -> 동작 O
     PORTB.4=0;
 
-   // UCSR0B=0xb8;
-   // UCSR0A=0x00;
-   // UCSR0C=0x26;
-   // UBRR0H=0x00;
-   // UBRR0L=0x07;
+    UCSR0B=0x18;
+    UCSR0A=0x00;
+    UCSR0C=0x26;
+    UBRR0H=0x00;
+    UBRR0L=0x07;
     lcd_init(16);
     lcd_puts("init_OK");
 
@@ -156,8 +127,7 @@ void main_init(void)
 }
 void LCD_display()
 {
-    //ADC=(int)ADCL+((int)ADCH<<8);
-    sprintf(arr_t,": %u",ADC_temp);
+    sprintf(arr_t,": %u",(int)((ADC_temp/5)*1023*0.01));
     string(arr1,0);
     string(arr2,1);
     string(arr3,2);
@@ -183,6 +153,9 @@ void LCD_display()
 void communication()
 {
     unsigned int j;
+    UCSR0B=0x98;
+    delay_us(100);
+    
 
     switch(data)
     {
@@ -205,32 +178,26 @@ void communication()
         case LAMP_4        : triac_time=4;                                                          break;
         case LAMP_5        : triac_time=5;                                                          break;
     }
+    delay_us(5);
+    UCSR0B=0x18;
 }
 void warning_sound()
 {
-    if(alarm==0)
+    if((alarm==0)&&(ADC_human>500))
     {
-        if(ADC_human>500)
-        {
             PORTC.4=0;
             delay_ms(5000);
             PORTC.4=1;
-        }
-        else
-            PORTC.4=1;
     }
-    else
-    {
-        if(ADC_human>500)
+    else if((alarm==1)&&(ADC_human>500))
         {
             PORTC.5=1;
             ring_caution();            //경보 (침입자)
         }
-    }
 }
 void power_block()
 {
-    if((ADC_smoke>300) && (ADC_temp>50))
+    if((ADC_smoke>300) && ((int)((ADC_temp/5)*1023*0.01)>50))
     {
         ring_caution();                 //경보 (화재)
         PORTG=0xff;
@@ -241,29 +208,29 @@ void power_block()
 void ADC_smoke_sensor()
 {
     ADC_state=0;
-    ADMUX=0x40;
+    ADMUX=0x00;
     ADCSRA=0xcf;
-    delay_ms(100);
+    delay_ms(5);
     ADCSRA=0xc7;
-    delay_ms(100);
+    delay_ms(2);
 }
 void ADC_temperature()
 {
     ADC_state=1;
     ADMUX=0x01;
     ADCSRA=0xcf;
-    delay_ms(100);
+    delay_ms(5);
     ADCSRA=0xc7;
-    delay_ms(100);
+    delay_ms(2);
 }
 void ADC_human_check()
 {
     ADC_state=2;
     ADMUX=0x02;
     ADCSRA=0xcf;
-    delay_ms(100);
-    ADCSRA=0xc7;
-    delay_ms(100);
+    delay_ms(5);
+    ADCSRA=0xc7;       
+    delay_ms(2);  
 }
 interrupt [ADC_INT] void adc_project(void)
 {
@@ -273,7 +240,7 @@ interrupt [ADC_INT] void adc_project(void)
         case 1 : ADC_temp=ADCW;
         case 2 : ADC_human=ADCW;
     }
-    ADC_temp=(int)(((ADC_temp*5)/1023)*0.01);
+    //ADC_temp=(int)(((ADC_temp*5)/1023)*0.01);
 }
 interrupt [EXT_INT4] void int_bell()
 {
@@ -287,7 +254,7 @@ interrupt [EXT_INT5] void triac_bright1()
     PORTB.4=1;
     switch(triac_time)
     {
-        case 0 : delay_us(0);    break;
+        case 0 : delay_us(1);    break;
         case 1 : delay_us(500);  break;
         case 2 : delay_us(1000); break;
         case 3 : delay_us(3000); break;
@@ -321,117 +288,39 @@ void ring_caution()
 }
 void ring_bell()
 {
-    Play_note(HG,N8);
-    Play_note(HE,N16);
-    Play_note(HF,N16);
-    Play_note(HG,N8);
-    Play_note(HE,N16);
-    Play_note(HF,N16);
-    Play_note(HG,N16);
-    Play_note(MG,N16);
-    Play_note(MA,N16);
-    Play_note(MB,N16);
-    Play_note(HC,N16);
-    Play_note(HD,N16);
-    Play_note(HE,N16);
-    Play_note(HF,N16);
-    Play_note(HE,N8);
-    Play_note(HC,N16);
-    Play_note(HD,N16);
-    Play_note(HE,N8);
-    Play_note(ME,N16);
-    Play_note(MF,N16);
-    Play_note(MG,N16);
-    Play_note(MA,N16);
-    Play_note(MG,N16);
-    Play_note(MF,N16);
-    Play_note(MG,N16);
-    Play_note(ME,N16);
-    Play_note(MF,N16);
-    Play_note(MG,N16);
-    Play_note(MF,N8);
-    Play_note(MA,N16);
-    Play_note(MG,N16);
-    Play_note(MF,N8);
-    Play_note(ME,N16);
-    Play_note(MD,N16);
-    Play_note(ME,N16);
-    Play_note(MD,N16);
-    Play_note(MC,N16);
-    Play_note(MD,N16);
-    Play_note(ME,N16);
-    Play_note(MF,N16);
-    Play_note(MG,N16);
-    Play_note(MA,N16);
-    Play_note(MF,N8);
-    Play_note(MA,N16);
-    Play_note(MG,N16);
-    Play_note(MA,N8);
-    Play_note(MB,N16);
-    Play_note(HC,N16);
-    Play_note(MG,N16);
-    Play_note(MA,N16);
-    Play_note(MB,N16);
-    Play_note(HC,N16);
-    Play_note(HD,N16);
-    Play_note(HE,N16);
-    Play_note(HF,N16);
-    Play_note(HG,N16);
-    Play_note(HE,N8);
-    Play_note(HC,N16);
-    Play_note(HD,N16);
-    Play_note(HE,N8);
-    Play_note(HD,N16);
-    Play_note(HC,N16);
-    Play_note(HD,N16);
-    Play_note(MB,N16);
-    Play_note(HC,N16);
-    Play_note(HD,N16);
-    Play_note(HE,N16);
-    Play_note(HD,N16);
-    Play_note(HC,N16);
-    Play_note(MB,N16);
-    Play_note(HC,N8);
-    Play_note(MA,N16);
-    Play_note(MB,N16);
-    Play_note(HC,N8);
-    Play_note(MC,N16);
-    Play_note(MD,N16);
-    Play_note(ME,N16);
-    Play_note(MF,N16);
-    Play_note(ME,N16);
-    Play_note(MD,N16);
-    Play_note(ME,N16);
-    Play_note(HC,N16);
-    Play_note(MB,N16);
-    Play_note(HC,N16);
-    Play_note(MA,N8);
-    Play_note(HC,N16);
-    Play_note(MB,N16);
-    Play_note(MA,N8);
-    Play_note(MG,N16);
-    Play_note(MF,N16);
-    Play_note(MG,N16);
-    Play_note(MF,N16);
-    Play_note(ME,N16);
-    Play_note(MF,N16);
-    Play_note(MG,N16);
-    Play_note(MA,N16);
-    Play_note(MB,N16);
-    Play_note(HC,N16);
-    Play_note(MA,N8);
-    Play_note(HC,N16);
-    Play_note(MB,N16);
-    Play_note(HC,N8);
-    Play_note(MB,N16);
-    Play_note(MA,N16);
-    Play_note(MB,N16);
-    Play_note(HC,N16);
-    Play_note(HD,N16);
-    Play_note(HC,N16);
-    Play_note(MB,N16);
-    Play_note(HC,N16);
-    Play_note(MA,N16);
-    Play_note(MB,N16);
-    Play_note(HC,ND4);
+
 }
+/*
+#include <mega128.h>
+#include <delay.h>
+char flag=1;
+void main()
+{
+    DDRB=0xff;
+    DDRC=0xff; 
+    PORTB=0xff;
+    EIMSK=0b01000000;
+    EICRB=0b00100000;
+    #asm("sei")
+    while(1)
+    {
+     flag++;
+     delay_ms(1200);
+     if(flag==6)flag=1;
+     }
+       }
+interrupt [EXT_INT6] void a(void)
+{
+ switch(flag)
+ {
+  case 1 : delay_us(300);
+  case 2 : delay_us(1000);
+  case 3 : delay_us(4000);
+  case 4 : delay_us(6000);
+  case 5 : delay_us(1);
+  }
+ PORTB=0x00;
+ delay_us(30);
+ PORTB=0xff;
+ }
+ */
