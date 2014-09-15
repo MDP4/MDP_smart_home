@@ -87,7 +87,6 @@ void main()
         LCD_display();
     }
 }
-
 void main_init(void)
 {
     DDRB=0xFF;
@@ -98,21 +97,19 @@ void main_init(void)
     DDRG=0x08;
     PORTG=0x00;     //PORTG.3 = 1 -> 동작 X / PORTCG.3=0 -> 동작 O
     PORTB.4=0;
-
+    
     UCSR0B=0x18;
     UCSR0A=0x00;
     UCSR0C=0x26;
     UBRR0H=0x00;
     UBRR0L=0x07;
     lcd_init(16);
-   // lcd_puts("init_OK");
 
     rtc_set_time(9,15,1);
     rtc_set_date(25,8,14);
     rtc_init(0,0,0);
     lcd_gotoxy(0,0);
     lcd_gotoxy(0,0);
-   // lcd_puts("init_OK2");
 
     EICRB=0b10101010;
     EIMSK=0b00110000;
@@ -124,9 +121,7 @@ void main_init(void)
 
     SREG=0x80;
     lcd_gotoxy(0,0);
-    //lcd_puts("init_OK3");
 }
-
 void LCD_display()
 {
     sprintf(arr_t,": %u",(int)((ADC_temp/5)*1023*0.01));
@@ -153,7 +148,6 @@ void LCD_display()
             (num2&0x0f)+((num2>>4)&0x0f)*10,(num1&0x0f)+((num1>>4)&0x0f)*10);
     lcd_puts(arr);
 }
-
 void communication()
 {
     unsigned int j;
@@ -183,7 +177,6 @@ void communication()
     delay_us(10);
     UCSR0B=0x18;
 }
-
 void warning_sound()
 {
     if((alarm==0)&&(ADC_human>500))
@@ -198,7 +191,6 @@ void warning_sound()
             while(1)ring_caution();            //경보 (침입자)
         }
 }
-
 void power_block()
 {
     if((ADC_smoke>300) && ((int)((ADC_temp/5)*1023*0.01)>50))
@@ -206,10 +198,8 @@ void power_block()
         ring_caution();                 //경보 (화재)
         PORTG=0xff;
     }
-    if(PINE.7==0)
-        PORTG=0x00;
+    if(PINE.7==0)   PORTG=0x00;
 }
-
 void ADC_smoke_sensor()
 {
     ADC_state=0;
@@ -219,7 +209,6 @@ void ADC_smoke_sensor()
     ADCSRA=0xc7;
     delay_ms(5);
 }
-
 void ADC_temperature()
 {
     ADC_state=1;
@@ -229,7 +218,6 @@ void ADC_temperature()
     ADCSRA=0xc7;
     delay_ms(5);
 }
-
 void ADC_human_check()
 {
     ADC_state=2;
@@ -239,7 +227,6 @@ void ADC_human_check()
     ADCSRA=0xc7;       
     delay_ms(5);  
 }
-
 interrupt [ADC_INT] void adc_project(void)
 {
     switch(ADC_state)
@@ -249,13 +236,11 @@ interrupt [ADC_INT] void adc_project(void)
         case 2 : ADC_human=ADCW;
     }
 }
-
 interrupt [EXT_INT4] void int_bell()
 {
     ring_bell();                //초인종
     delay_ms(2);
 }
-
 interrupt [EXT_INT5] void triac_bright1()
 {
     PORTB.4=1;
@@ -267,10 +252,8 @@ interrupt [EXT_INT5] void triac_bright1()
         case 3 : delay_us(3000); break;
         case 4 : delay_us(5000); break;
         case 5 : delay_us(7500);
-    }
-    PORTB.4=0;
+    }    PORTB.4=0;
 }
-
 void Play_note(unsigned int sound, unsigned int note)
 {
     ICR1= sound;
@@ -279,7 +262,6 @@ void Play_note(unsigned int sound, unsigned int note)
     delay_ms(note*tempo*7);
     TCCR1B = 0x18;
 }
-
 interrupt [USART0_RXC] void a(void)
 {
     new_line++;
@@ -288,22 +270,18 @@ interrupt [USART0_RXC] void a(void)
       data=UDR0;
       delay_us(5);
       new_line=0;
-    }
-    
+    }   
 }
-
 void string(char *p,char code)
 {
     char i,a;
     a=(code<<3)|0x40;
     for(i=0;i<8;i++)lcd_write_byte(a++,*p++);
 }
-
 void ring_caution()
 {
     Play_note(HE,N1);
 }
-
 void ring_bell()
 {
    Play_note(HG,N8);
@@ -395,63 +373,4 @@ void ring_bell()
     Play_note(MB,N16);
     Play_note(MA,N8);
     Play_note(MG,N16);
-    Play_note(MF,N16);
-    Play_note(MG,N16);
-    Play_note(MF,N16);
-    Play_note(ME,N16);
-    Play_note(MF,N16);
-    Play_note(MG,N16);
-    Play_note(MA,N16);
-    Play_note(MB,N16);
-    Play_note(HC,N16);
-    Play_note(MA,N8);
-    Play_note(HC,N16);
-    Play_note(MB,N16);
-    Play_note(HC,N8);
-    Play_note(MB,N16);
-    Play_note(MA,N16);
-    Play_note(MB,N16);
-    Play_note(HC,N16);
-    Play_note(HD,N16);
-    Play_note(HC,N16);
-    Play_note(MB,N16);
-    Play_note(HC,N16);
-    Play_note(MA,N16);
-    Play_note(MB,N16);
-    Play_note(HC,ND4);
 }
-/*
-#include <mega128.h>
-#include <delay.h>
-char flag=1;
-void main()
-{
-    DDRB=0xff;
-    DDRC=0xff; 
-    PORTB=0xff;
-    EIMSK=0b01000000;
-    EICRB=0b00100000;
-    #asm("sei")
-    while(1)
-    {
-     flag++;
-     delay_ms(1200);
-     if(flag==6)flag=1;
-     }
-       }
-interrupt [EXT_INT6] void a(void)
-{
- switch(flag)
- {
-  case 1 : delay_us(300);
-  case 2 : delay_us(1000);
-  case 3 : delay_us(4000);
-  case 4 : delay_us(6000);
-  case 5 : delay_us(1);
-  }
- PORTB=0x00;
- delay_us(30);
- PORTB=0xff;
- }
- */
- 
