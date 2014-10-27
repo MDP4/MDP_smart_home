@@ -50,9 +50,8 @@
 void main_init(void);
 void communication(void);
 void LCD_display();
-void ADC_smoke_sensor();
-void ADC_temperature();
-void ADC_human_check();
+void ADC_function();
+int ADC_func(unsigned char);
 void Play_note(unsigned int sound, unsigned int note);
 void string(char *p,char code);
 void warning_sound();
@@ -70,18 +69,15 @@ char arr3[8]={0x01, 0x13, 0x13, 0x1D, 0x01, 0x08, 0x0E, 0x00};
 int alarm=0;             //alarm=1 : 경보 on, alarm=0 : 경보 off
 int triac_time;          // 트라이악(램프 제어) 인터럽트에서 시간
 char data;               //수신 문자
-int ADC_state=0, ADC_temp, ADC_smoke, ADC_human;
+int  ADC_temp, ADC_smoke, ADC_human;
 
 void main()
 {
     main_init();
-
     while(1)
     {
         communication();
-        ADC_smoke_sensor();
-        ADC_temperature();
-        ADC_human_check();
+        ADC_function();
         warning_sound();
         power_block();
         LCD_display();
@@ -200,41 +196,23 @@ void power_block()
     }
     if(PINE.7==0)   PORTG=0x00;
 }
-void ADC_smoke_sensor()
+void ADC_function()
 {
-    ADC_state=0;
-    ADMUX=0x00;
-    ADCSRA=0xcf;
+    ADC_smoke=ADC_func(0x00);
     delay_ms(5);
-    ADCSRA=0xc7;
+    ADC_temp=ADC_func(0x01);
+    delay_ms(5);
+    ADC_human=ADC_func(0x02);
     delay_ms(5);
 }
-void ADC_temperature()
+int ADC_func(unsigned char adc_input)
 {
-    ADC_state=1;
-    ADMUX=0x01;
-    ADCSRA=0xcf;
-    delay_ms(5);
-    ADCSRA=0xc7;
-    delay_ms(5);
-}
-void ADC_human_check()
-{
-    ADC_state=2;
-    ADMUX=0x02;
-    ADCSRA=0xcf;
-    delay_ms(5);
-    ADCSRA=0xc7;       
-    delay_ms(5);  
-}
-interrupt [ADC_INT] void adc_project(void)
-{
-    switch(ADC_state)
-    {
-        case 0 : ADC_smoke=ADCW;
-        case 1 : ADC_temp=ADCW;
-        case 2 : ADC_human=ADCW;
-    }
+    ADMUX=adc_input|0x00;
+    ADCSRA|=0xc7; 
+    delay_ms(13);
+    while(!(ADCSRA&0x10));
+    ADCSRA|=0x10;
+    return ADCW;
 }
 interrupt [EXT_INT4] void int_bell()
 {
@@ -354,23 +332,4 @@ void ring_bell()
     Play_note(HD,N16);
     Play_note(HC,N16);
     Play_note(MB,N16);
-    Play_note(HC,N8);
-    Play_note(MA,N16);
-    Play_note(MB,N16);
-    Play_note(HC,N8);
-    Play_note(MC,N16);
-    Play_note(MD,N16);
-    Play_note(ME,N16);
-    Play_note(MF,N16);
-    Play_note(ME,N16);
-    Play_note(MD,N16);
-    Play_note(ME,N16);
-    Play_note(HC,N16);
-    Play_note(MB,N16);
-    Play_note(HC,N16);
-    Play_note(MA,N8);
-    Play_note(HC,N16);
-    Play_note(MB,N16);
-    Play_note(MA,N8);
-    Play_note(MG,N16);
 }
