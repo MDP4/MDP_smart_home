@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <lcd.h>
 #include <ds1302.h>
+#include <eeprom.h>
 #asm
    .equ __ds1302_port=0x1B ;PORTA
    .equ __ds1302_io=1
@@ -58,35 +59,41 @@ void warning_sound();
 void power_block();
 void ring_bell();
 void ring_caution();
+void HTTP_Put_Char(char);
+void Put_Char(char);
+void triac_bright1();
 
-unsigned char tempo=5,new_line=0;
+unsigned char tempo=5,tmp;
 char arr[16];
 char arr_t[16];
 char num1,num2,num3,num4,num5,num6,num7;
 char arr1[8]={0x0E, 0x11, 0x0E, 0x04, 0x1F, 0x00, 0x10, 0x1F};
 char arr2[8]={0x00, 0x1E, 0x10, 0x1E, 0x00, 0x04, 0x1F, 0x00};
 char arr3[8]={0x01, 0x13, 0x13, 0x1D, 0x01, 0x08, 0x0E, 0x00};
-int alarm=0;             //alarm=1 : 경보 on, alarm=0 : 경보 off
-int triac_time;          // 트라이악(램프 제어) 인터럽트에서 시간
+int alarm;             //alarm=1 : 경보 on, alarm=0 : 경보 off
+int triac_time=4,i;          // 트라이악(램프 제어) 인터럽트에서 시간
 char data;               //수신 문자
 int  ADC_temp, ADC_smoke, ADC_human;
+int line;
 
 void main()
 {
     main_init();
     while(1)
     {
-        communication();
+        communication(); 
+        LCD_display();  
         ADC_function();
         warning_sound();
-        power_block();
-        LCD_display();
+        power_block(); 
+        //triac_bright1();        
+        delay_ms(300);
     }
 }
 void main_init(void)
 {
     DDRB=0xFF;
-    DDRC=0x00;
+    DDRC=0b11100111;
     DDRD=0xFF;
     DDRE=0x0E;
     DDRF=0x00;
@@ -94,17 +101,17 @@ void main_init(void)
     PORTG=0x00;     //PORTG.3 = 1 -> 동작 X / PORTCG.3=0 -> 동작 O
     PORTB.4=0;
     
-    UCSR0B=0x18;
     UCSR0A=0x00;
-    UCSR0C=0x26;
+    UCSR0B=0xD8;    // R_T_interrupt_en R_T_EN
+    UCSR0C=0x06;    //8bit Data
     UBRR0H=0x00;
-    UBRR0L=0x07;
+    UBRR0L=103;     //9600bps 
+
     lcd_init(16);
 
-    rtc_set_time(9,15,1);
-    rtc_set_date(25,8,14);
-    rtc_init(0,0,0);
-    lcd_gotoxy(0,0);
+    //rtc_set_time(9,0,1);
+    //rtc_set_date(3,11,14);
+    //rtc_init(0,0,0);
     lcd_gotoxy(0,0);
 
     EICRB=0b10101010;
@@ -113,6 +120,11 @@ void main_init(void)
     TCCR1A = 0x40;
     TCCR1B = 0x18;
     TCCR1C = 0x00;
+    
+    TCCR0=0b00000111; 
+    TIMSK|=1; 
+    TCNT0=0;
+    
     ADCSRA=0x87;
 
     SREG=0x80;
@@ -120,7 +132,7 @@ void main_init(void)
 }
 void LCD_display()
 {
-    sprintf(arr_t,": %u",(int)((ADC_temp/5)*1023*0.01));
+    sprintf(arr_t,": %d",tmp=(int)(ADC_temp*0.4));
     string(arr1,0);
     string(arr2,1);
     string(arr3,2);
@@ -144,21 +156,32 @@ void LCD_display()
             (num2&0x0f)+((num2>>4)&0x0f)*10,(num1&0x0f)+((num1>>4)&0x0f)*10);
     lcd_puts(arr);
 }
+void HTTP_Put_Char(char tem)    //보낼 문자
+{
+    unsigned int gg = 0;                                          
+    while((eeprom_read_byte(gg) != '\0')) Put_Char(eeprom_read_byte(gg++));  
+    Put_Char(':');
+    Put_Char(' ');
+    Put_Char('2'); 
+    Put_Char('\n');
+    Put_Char('\n');
+    Put_Char((tem/10)+'0');   
+    Put_Char((tem%10)+'0');
+}
 void communication()
 {
     unsigned int j;
-    UCSR0B=0x98;
     delay_ms(10);
     switch(data)
     {
         case VALVE_OPEN    : for(j=0;j<40;j++){PORTB.6=1; delay_us(1050); PORTB.6=0; delay_ms(23);} break;
-        case VALVE_CLOSE   : for(j=0;j<40;j++){PORTB.6=0; delay_ms(1930); PORTB.6=1; delay_ms(23);} break;
-        case WINDOW_OPEN   : for(j=0;j<40;j++){PORTB.7=1; delay_ms(1050); PORTB.7=0; delay_ms(23);} break;
-        case WINDOW_CLOSE  : for(j=0;j<40;j++){PORTB.7=0; delay_ms(1930); PORTB.7=1; delay_ms(23);} break;
-        case CURTAIN_OPEN  : do{PORTC.6=0; PORTC.7=1; delay_ms(10);}while(PINE.5==0);               break;
-        case CURTAIN_CLOSE : do{PORTC.6=1; PORTC.7=0; delay_ms(10);}while(PINE.6==0);               break;
-        case LED1_ON       : PORTC.5=0;                                                             break;
-        case LED1_OFF      : PORTC.5=1;                                                             break;
+        case VALVE_CLOSE   : for(j=0;j<40;j++){PORTB.6=0; delay_us(1930); PORTB.6=1; delay_ms(23);} break;
+        case WINDOW_OPEN   : for(j=0;j<40;j++){PORTB.7=1; delay_us(1050); PORTB.7=0; delay_ms(23);} break;
+        case WINDOW_CLOSE  : for(j=0;j<40;j++){PORTB.7=0; delay_us(1930); PORTB.7=1; delay_ms(23);} break;
+        case CURTAIN_OPEN  : PORTC.6=0; PORTC.5=1; delay_ms(500); PORTC.6=0; PORTC.5=0;                                break;
+        case CURTAIN_CLOSE : PORTC.6=1; PORTC.5=0; delay_ms(500); PORTC.6=0; PORTC.5=0;                                  break;
+        case LED1_ON       : PORTC.3=1;                                                             break;
+        case LED1_OFF      : PORTC.3=0;                                                             break;
         case WARNING_ON    : alarm=1;                                                               break;
         case WARNING_OFF   : alarm=0;                                                               break;
         case STOVE1_ON     : PORTE.2=0;                                                             break;
@@ -170,18 +193,20 @@ void communication()
         case LAMP_4        : triac_time=4;                                                          break;
         case LAMP_5        : triac_time=5; 
     }
+    data=0;
+       
+     lcd_init(16);
     delay_us(10);
-    UCSR0B=0x18;
 }
 void warning_sound()
 {
-    if((alarm==0)&&(ADC_human>500))
+    if((alarm==0)&&(ADC_human>100))
     {
-            PORTC.4=0;
-            delay_ms(5000);
             PORTC.4=1;
+            delay_ms(5000);
+            PORTC.4=0;
     }
-    else if((alarm==1)&&(ADC_human>500))
+    else if((alarm==1)&&(ADC_human>100))
         {
             PORTC.5=1;
             while(1)ring_caution();            //경보 (침입자)
@@ -199,11 +224,11 @@ void power_block()
 void ADC_function()
 {
     ADC_smoke=ADC_func(0x00);
-    delay_ms(5);
+    delay_ms(15);
     ADC_temp=ADC_func(0x01);
-    delay_ms(5);
+    delay_ms(15);
     ADC_human=ADC_func(0x02);
-    delay_ms(5);
+    delay_ms(15);
 }
 int ADC_func(unsigned char adc_input)
 {
@@ -219,19 +244,37 @@ interrupt [EXT_INT4] void int_bell()
     ring_bell();                //초인종
     delay_ms(2);
 }
-interrupt [EXT_INT5] void triac_bright1()
+
+interrupt [TIM0_OVF] void temp()
 {
-    PORTB.4=1;
+    i++;
+      if(i==500)
+     {
+        HTTP_Put_Char(tmp); 
+      }
+}  
+
+void triac_bright1()
+{
+    delay_us(20);
+    PORTB.4=0;
     switch(triac_time)
     {
-        case 0 : delay_us(1);    break;
+        case 0 :                 break;
         case 1 : delay_us(500);  break;
         case 2 : delay_us(1000); break;
         case 3 : delay_us(3000); break;
         case 4 : delay_us(5000); break;
         case 5 : delay_us(7500);
-    }    PORTB.4=0;
+    }    
+    PORTB.4=1;
 }
+void Put_Char(char UART_String)
+{
+    while (!(UCSR0A & 0x20));
+    UDR0 = UART_String;
+}
+
 void Play_note(unsigned int sound, unsigned int note)
 {
     ICR1= sound;
@@ -242,13 +285,12 @@ void Play_note(unsigned int sound, unsigned int note)
 }
 interrupt [USART0_RXC] void a(void)
 {
-    new_line++;
-    if(new_line==9)
-    {
-      data=UDR0;
-      delay_us(5);
-      new_line=0;
-    }   
+      if(UDR0=='\n') line++;
+      if(line>=9)
+      {
+            data=UDR0;
+	   line=0;
+      }
 }
 void string(char *p,char code)
 {
@@ -306,30 +348,6 @@ void ring_bell()
     Play_note(MA,N16);
     Play_note(MF,N8);
     Play_note(MA,N16);
-    Play_note(MG,N16);
-    Play_note(MA,N8);
-    Play_note(MB,N16);
-    Play_note(HC,N16); 
-    Play_note(MG,N16);
-    Play_note(MA,N16);
-    Play_note(MB,N16);
-    Play_note(HC,N16);
-    Play_note(HD,N16);
-    Play_note(HE,N16);
-    Play_note(HF,N16);
-    Play_note(HG,N16); 
-    Play_note(HE,N8);
-    Play_note(HC,N16);
-    Play_note(HD,N16);
-    Play_note(HE,N8);
-    Play_note(HD,N16);
-    Play_note(HC,N16);
-    Play_note(HD,N16);
-    Play_note(MB,N16);
-    Play_note(HC,N16);
-    Play_note(HD,N16);
-    Play_note(HE,N16);
-    Play_note(HD,N16);
-    Play_note(HC,N16);
-    Play_note(MB,N16);
+    Play_note(MG,N16); 
+     lcd_init(16);
 }
