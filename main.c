@@ -109,9 +109,9 @@ void main_init(void)
 
     lcd_init(16);
 
-    //rtc_set_time(9,0,1);
-    //rtc_set_date(3,11,14);
-    //rtc_init(0,0,0);
+    rtc_set_time(9,0,1);
+    rtc_set_date(3,11,14);
+    rtc_init(0,0,0);
     lcd_gotoxy(0,0);
 
     EICRB=0b10101010;
@@ -269,12 +269,12 @@ void triac_bright1()
     PORTB.4=0;
     switch(triac_time)
     {
-        case 0 :                 break;
-        case 1 : delay_us(1616);  break;
-        case 2 : delay_us(1566); break;
-        case 3 : delay_us(1366); break;
+        case 0 : delay_us(16666); break;
+        case 1 : delay_us(16166); break;
+        case 2 : delay_us(15666); break;
+        case 3 : delay_us(13666); break;
         case 4 : delay_us(1100); break;
-        case 5 : delay_us(916);
+        case 5 : delay_us(9166);
     }  
     PORTB.4=1;
 }
