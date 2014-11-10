@@ -196,17 +196,16 @@ void communication()
     data=0;
        
      lcd_init(16);
-    delay_us(10);
 }
 void warning_sound()
 {
-    if((alarm==0)&&(ADC_human>100))
+    if((alarm==0)&&(ADC_human>50))
     {
             PORTC.4=1;
             delay_ms(5000);
             PORTC.4=0;
     }
-    else if((alarm==1)&&(ADC_human>100))
+    else if((alarm==1)&&(ADC_human>50))
         {
             PORTC.5=1;
             while(1)ring_caution();            //경보 (침입자)
@@ -217,9 +216,9 @@ void power_block()
     if((ADC_smoke>300) && ((int)((ADC_temp/5)*1023*0.01)>50))
     {
         ring_caution();                 //경보 (화재)
-        PORTG=0xff;
+        //PORTG=0xff;
     }
-    if(PINE.7==0)   PORTG=0x00;
+    //if(PINE.7==0)   PORTG=0x00;
 }
 void ADC_function()
 {
@@ -232,9 +231,9 @@ void ADC_function()
 }
 int ADC_func(unsigned char adc_input)
 {
-    ADMUX=adc_input|0x00;
+    ADMUX=adc_input|0x40;
     ADCSRA|=0xc7; 
-    delay_ms(13);
+    delay_ms(20);
     while(!(ADCSRA&0x10));
     ADCSRA|=0x10;
     return ADCW;
@@ -273,7 +272,7 @@ void triac_bright1()
         case 1 : delay_us(16166); break;
         case 2 : delay_us(15666); break;
         case 3 : delay_us(13666); break;
-        case 4 : delay_us(1100); break;
+        case 4 : delay_us(1100);  break;
         case 5 : delay_us(9166);
     }  
     PORTB.4=1;
@@ -356,7 +355,5 @@ void ring_bell()
     Play_note(MG,N16);
     Play_note(MA,N16);
     Play_note(MF,N8);
-    Play_note(MA,N16);
-    Play_note(MG,N16); 
      lcd_init(16);
 }
