@@ -86,7 +86,7 @@ void main()
         ADC_function();
         warning_sound();
         power_block(); 
-        //triac_bright1();        
+        triac_bright1();        
         delay_ms(300);
     }
 }
@@ -256,8 +256,7 @@ interrupt [TIM0_OVF] void temp()
 
 void triac_bright1()
 {
-    delay_us(20);
-    PORTB.4=0;
+    
     switch(triac_time)
     {
         case 0 :                 break;
@@ -266,7 +265,17 @@ void triac_bright1()
         case 3 : delay_us(3000); break;
         case 4 : delay_us(5000); break;
         case 5 : delay_us(7500);
-    }    
+    }
+    PORTB.4=0;
+    switch(triac_time)
+    {
+        case 0 :                 break;
+        case 1 : delay_us(1616);  break;
+        case 2 : delay_us(1566); break;
+        case 3 : delay_us(1366); break;
+        case 4 : delay_us(1100); break;
+        case 5 : delay_us(916);
+    }  
     PORTB.4=1;
 }
 void Put_Char(char UART_String)
