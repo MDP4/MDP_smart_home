@@ -174,10 +174,10 @@ void communication()
     delay_ms(10);
     switch(data)
     {
-        case VALVE_OPEN    : for(j=0;j<40;j++){PORTB.6=1; delay_us(1050); PORTB.6=0; delay_ms(23);} break;
-        case VALVE_CLOSE   : for(j=0;j<40;j++){PORTB.6=0; delay_us(1930); PORTB.6=1; delay_ms(23);} break;
-        case WINDOW_OPEN   : for(j=0;j<40;j++){PORTB.7=1; delay_us(1050); PORTB.7=0; delay_ms(23);} break;
-        case WINDOW_CLOSE  : for(j=0;j<40;j++){PORTB.7=0; delay_us(1930); PORTB.7=1; delay_ms(23);} break;
+        case VALVE_OPEN    : for(j=0;j<40;j++){PORTB.6=1; delay_us(200); PORTB.6=0; delay_ms(23);} break;
+        case VALVE_CLOSE   : for(j=0;j<40;j++){PORTB.6=1; delay_us(1400); PORTB.6=0; delay_ms(23);} break;
+        case WINDOW_OPEN   : for(j=0;j<40;j++){PORTB.7=1; delay_us(200); PORTB.7=0; delay_ms(23);} break;
+        case WINDOW_CLOSE  : for(j=0;j<40;j++){PORTB.7=1; delay_us(1400); PORTB.7=0; delay_ms(23);} break;
         case CURTAIN_OPEN  : PORTC.6=0; PORTC.5=1; delay_ms(500); PORTC.6=0; PORTC.5=0;                                break;
         case CURTAIN_CLOSE : PORTC.6=1; PORTC.5=0; delay_ms(500); PORTC.6=0; PORTC.5=0;                                  break;
         case LED1_ON       : PORTC.3=1;                                                             break;
